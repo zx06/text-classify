@@ -3,7 +3,6 @@ package handler
 import (
 	"os"
 	"path/filepath"
-	"sync"
 )
 
 type ResultWriter struct {
@@ -22,9 +21,9 @@ func NewResultWriter(ch chan *Result, base string, chanSize int) *ResultWriter {
 	}
 }
 
-func (w *ResultWriter) Run(wg *sync.WaitGroup) {
+func (w *ResultWriter) Run(wgDone func()) {
 	go func() {
-		defer wg.Done()
+		defer wgDone()
 		for r := range w.resultCh {
 			c, ok := w.mc[r.key]
 			// key不存在时新建chan并启动新协程处理写入

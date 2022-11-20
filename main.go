@@ -8,10 +8,10 @@ import (
 )
 
 func main() {
-	t0:=time.Now()
-	err := handler.Handler("data/records", "data/results", ".txt", 1000)
+	t0 := time.Now()
+	err := handler.Handler("data/records", "data/results", ".txt", 1000*15)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("cost: "+time.Since(t0).String())
+	fmt.Println("cost: " + time.Since(t0).String())
 }
