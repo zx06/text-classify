@@ -45,6 +45,7 @@ func (c *DataClassfier) Run() {
 						// todo: 这里会按本地时区解析，如需指定市区需调整时区
 						key := time.UnixMilli(data.Timestamp).Format("20060102")
 						c.resultCh <- &Result{
+							ts:   data.Timestamp,
 							key:  key,
 							data: line,
 						}

@@ -18,7 +18,7 @@ func Handler(input, output, suffix string, chanSize int) error {
 	wg1.Add(1)
 	lineCh := make(chan []byte, chanSize)
 	resultCh := make(chan *Result, chanSize)
-	rw := NewResultWriter(resultCh, output, chanSize)
+	rw := NewSortedFileWriter(resultCh, output, chanSize)
 	rw.Run(wg1.Done)
 	dc := NewDataClassfier(lineCh, resultCh, "张三", runtime.GOMAXPROCS(0)*2)
 	dc.Run()
@@ -58,6 +58,19 @@ func LineReader(path string, ch chan []byte, wgDone func()) {
 }
 
 type Result struct {
+	ts   int64
 	key  string
 	data []byte
+}
+
+type Results []*Result
+
+func (r Results) Len() int {
+	return len(r)
+}
+func (r Results) Less(i, j int) bool {
+	return r[i].ts < r[j].ts
+}
+func (r Results) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
 }

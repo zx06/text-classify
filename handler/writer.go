@@ -1,19 +1,23 @@
 package handler
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"sync"
+	"time"
 )
 
-type ResultWriter struct {
+type FileWriter struct {
 	chanSize int
 	mc       map[string]chan []byte
 	resultCh chan *Result
 	base     string
 }
 
-func NewResultWriter(ch chan *Result, base string, chanSize int) *ResultWriter {
-	return &ResultWriter{
+func NewFileWriter(ch chan *Result, base string, chanSize int) *FileWriter {
+	return &FileWriter{
 		chanSize: chanSize,
 		mc:       make(map[string]chan []byte),
 		resultCh: ch,
@@ -21,7 +25,7 @@ func NewResultWriter(ch chan *Result, base string, chanSize int) *ResultWriter {
 	}
 }
 
-func (w *ResultWriter) Run(wgDone func()) {
+func (w *FileWriter) Run(wgDone func()) {
 	go func() {
 		defer wgDone()
 		for r := range w.resultCh {
@@ -44,7 +48,7 @@ func (w *ResultWriter) Run(wgDone func()) {
 	}()
 }
 
-func (w *ResultWriter) writer(dataChan chan []byte, path string) {
+func (w *FileWriter) writer(dataChan chan []byte, path string) {
 	f, err := os.Create(path)
 	if err != nil {
 		// todo: 错误处理
@@ -53,6 +57,62 @@ func (w *ResultWriter) writer(dataChan chan []byte, path string) {
 	defer f.Close()
 	for b := range dataChan {
 		b = append(b, '\n')
+		_, err = f.Write(b)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+type SortedFileWriter struct {
+	resultCh chan *Result
+	data     map[string]Results
+	chanSize int
+	base     string
+}
+
+func NewSortedFileWriter(ch chan *Result, base string, chanSize int) *SortedFileWriter {
+	return &SortedFileWriter{
+		resultCh: ch,
+		data:     make(map[string]Results),
+		chanSize: chanSize,
+		base:     base,
+	}
+}
+func (w *SortedFileWriter) Run(wgDone func()) {
+	go func() {
+		defer wgDone()
+		for r := range w.resultCh {
+			c, ok := w.data[r.key]
+			if !ok {
+				c = Results{}
+				w.data[r.key] = c
+			}
+			w.data[r.key] = append(c, r)
+		}
+		var writerWg sync.WaitGroup
+		for k, v := range w.data {
+			writerWg.Add(1)
+			t0 := time.Now()
+			sort.Sort(v)
+			fmt.Printf("sort [%s] cost %s\n", k, time.Since(t0))
+			go w.writer(v, filepath.Join(w.base, k), writerWg.Done)
+		}
+		writerWg.Wait()
+
+	}()
+}
+
+func (w *SortedFileWriter) writer(data Results, path string, wgDone func()) {
+	defer wgDone()
+	f, err := os.Create(path)
+	if err != nil {
+		// todo: 错误处理
+		panic(err)
+	}
+	defer f.Close()
+	for _, v := range data {
+		b := append(v.data, '\n')
 		_, err = f.Write(b)
 		if err != nil {
 			panic(err)

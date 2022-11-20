@@ -13,5 +13,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("cost: " + time.Since(t0).String())
+	fmt.Println("total cost: " + time.Since(t0).String())
 }
