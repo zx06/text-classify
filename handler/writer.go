@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// FileWriter 这里只做流式并发写入，未包含排序
 type FileWriter struct {
 	chanSize int
 	mc       map[string]chan []byte
@@ -64,6 +65,7 @@ func (w *FileWriter) writer(dataChan chan []byte, path string) {
 	}
 }
 
+// SortedFileWriter 这里会先收集数据，然后单个文件数据中做排序，内存占用会较多
 type SortedFileWriter struct {
 	resultCh chan *Result
 	data     map[string]Results
@@ -82,6 +84,7 @@ func NewSortedFileWriter(ch chan *Result, base string, chanSize int) *SortedFile
 func (w *SortedFileWriter) Run(wgDone func()) {
 	go func() {
 		defer wgDone()
+		// 此处只是单纯的将chan中的数据按key分组丢到map中
 		for r := range w.resultCh {
 			c, ok := w.data[r.key]
 			if !ok {
@@ -94,8 +97,10 @@ func (w *SortedFileWriter) Run(wgDone func()) {
 		for k, v := range w.data {
 			writerWg.Add(1)
 			t0 := time.Now()
+			// 排序
 			sort.Sort(v)
 			fmt.Printf("sort [%s] cost %s\n", k, time.Since(t0))
+			// 并发的将排序后的数据写道文件中
 			go w.writer(v, filepath.Join(w.base, k), writerWg.Done)
 		}
 		writerWg.Wait()
